@@ -7,6 +7,9 @@ venv/
 
 # Data and Artifacts (CRITICAL FOR ML/DL)
 
+# Ignore raw data files
+data/raw/
+
 # Ignore processed data files, including the temporary extraction folders
 # The core processed data (splits) must also be ignored
 data/processed/splits/
