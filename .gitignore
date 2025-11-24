@@ -1,0 +1,15 @@
+# General Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+venv/
+.env
+
+# Data and Artifacts (CRITICAL FOR ML/DL)
+# Ignore all raw and processed data (since it's massive and often proprietary)
+data/raw/
+data/processed/
+
+# Ignore large model weights and artifacts
+models/*.pt
+models/*.pth
