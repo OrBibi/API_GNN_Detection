@@ -6,9 +6,14 @@ venv/
 .env
 
 # Data and Artifacts (CRITICAL FOR ML/DL)
-# Ignore all raw and processed data (since it's massive and often proprietary)
+
+# Ignore all raw data
 data/raw/
-data/processed/
+
+# Ignore processed data files, including the temporary extraction folders
+# The core processed data (splits) must also be ignored
+data/processed/splits/
+data/processed/*_extracted/
 
 # Ignore large model weights and artifacts
 models/*.pt
