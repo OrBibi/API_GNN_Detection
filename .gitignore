@@ -11,10 +11,6 @@ venv/
 data/processed/splits/
 data/processed/*_extracted/
 
-# Models
-models/*.pth
-models/*.pkl
-
 # Logs and environment
 .env
 *.log
