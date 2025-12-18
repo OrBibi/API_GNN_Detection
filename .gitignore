@@ -1,0 +1,23 @@
+# General Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+venv/
+.env
+
+
+# Data (We only keep raw 7z files in the repository if they are small, 
+# otherwise we ignore them and let the user download them)
+data/processed/splits/
+data/processed/*_extracted/
+
+# Models
+models/*.pth
+models/*.pkl
+
+# Logs and environment
+.env
+*.log
+
+# Docker
+.dockerignore

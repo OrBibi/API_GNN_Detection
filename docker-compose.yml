@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  # Redis: Task Queue Broker
+  redis:
+    image: "redis:alpine"
+    ports:
+      - "6379:6379"
+
+  # Backend: FastAPI Server
+  backend:
+    build: .
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+    environment:
+      - REDIS_URL=redis://redis:6379
+
+  # Worker: Heavy ML Processing
+  worker:
+      build: .
+      volumes:
+        - .:/app
+      environment:
+        - REDIS_URL=redis://redis:6379
+        - PYTHONPATH=/app
+      depends_on:
+        - redis
+      # Run from root /app so it can resolve 'worker.tasks'
+      working_dir: /app
+      command: rq worker --url redis://redis:6379 default
+
+  # Frontend: Simple Web UI
+  frontend:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html
+    depends_on:
+      - backend

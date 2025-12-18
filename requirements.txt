@@ -1,0 +1,16 @@
+pandas
+numpy
+scikit-learn
+pyarrow
+py7zr
+joblib
+torch
+torch-geometric
+tqdm
+fastapi
+uvicorn
+redis
+rq
+pydantic
+python-multipart
+requests
