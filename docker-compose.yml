@@ -10,6 +10,7 @@ services:
   # Backend: FastAPI Server
   backend:
     build: .
+    # Use full module path starting from /app
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"
@@ -19,20 +20,18 @@ services:
       - redis
     environment:
       - REDIS_URL=redis://redis:6379
+      - PYTHONPATH=/app
 
   # Worker: Heavy ML Processing
   worker:
-      build: .
-      volumes:
-        - .:/app
-      environment:
-        - REDIS_URL=redis://redis:6379
-        - PYTHONPATH=/app
-      depends_on:
-        - redis
-      # Run from root /app so it can resolve 'worker.tasks'
-      working_dir: /app
-      command: rq worker --url redis://redis:6379 default
+    build: .
+    working_dir: /app
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - PYTHONPATH=/app
+    command: rq worker --url redis://redis:6379 default
+    volumes:
+      - .:/app
 
   # Frontend: Simple Web UI
   frontend:

@@ -2,170 +2,54 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>API Intrusion Detection Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>GNN API Guard</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; background: #f4f4f9; }
+        textarea { width: 100%; height: 200px; font-family: monospace; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-top: 10px; }
+        #result { margin-top: 20px; padding: 15px; border-radius: 5px; display: none; }
+        .Attack { background: #ffdada; color: #a94442; border: 1px solid #ebccd1; }
+        .Benign { background: #dff0d8; color: #3c763d; border: 1px solid #d6e9c6; }
+    </style>
 </head>
-<body class="bg-gray-100 font-sans">
-    <div class="container mx-auto p-8">
-        <h1 class="text-4xl font-bold text-gray-800 mb-8 text-center">API Guard: AI-Powered Detection</h1>
+<body>
+    <h1>🛡️ API Log Classifier</h1>
+    <p>Paste a full JSON log (request/response) to analyze:</p>
+    <textarea id="logInput" placeholder='{"request": {...}, "response": {...}}'></textarea>
+    <button onclick="sendAnalysis()">Analyze Log</button>
 
-        <div class="bg-white p-6 rounded-lg shadow-md mb-8">
-            <h2 class="text-xl font-semibold mb-4 text-blue-600">Analyze New Request</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input id="apiPath" type="text" placeholder="API Path (e.g. /api/v1/user/login)" class="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <select id="apiMethod" class="border p-2 rounded bg-white">
-                    <option value="GET">GET</option>
-                    <option value="POST">POST</option>
-                    <option value="PUT">PUT</option>
-                    <option value="DELETE">DELETE</option>
-                </select>
-            </div>
-            <textarea id="apiBody" placeholder="Request Body (JSON format)" class="w-full border p-2 mt-4 rounded h-32 font-mono text-sm"></textarea>
-            <button onclick="sendAnalysis()" class="mt-4 bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition font-bold shadow-lg">
-                Analyze with Stacking Manager
-            </button>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div class="bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-xl font-semibold mb-4 border-b pb-2">Recent Analyses</h2>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse" id="resultsTable">
-                        <thead>
-                            <tr class="bg-gray-100">
-                                <th class="p-3 border text-gray-600">Job ID</th>
-                                <th class="p-3 border text-gray-600 text-center">Result</th>
-                                <th class="p-3 border text-gray-600 text-right">Confidence</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-200">
-                            </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="bg-white p-6 rounded-lg shadow-md flex flex-col items-center">
-                <h2 class="text-xl font-semibold mb-4 border-b pb-2 w-full text-center">Live Threat Overview</h2>
-                <div class="w-64 h-64">
-                    <canvas id="statsChart"></canvas>
-                </div>
-                <div class="mt-4 flex gap-4 text-sm font-medium">
-                    <span class="text-green-600">● Benign: <span id="benignLabel">0</span></span>
-                    <span class="text-red-600">● Attack: <span id="attackLabel">0</span></span>
-                </div>
-            </div>
-        </div>
-    </div>
+    <div id="result"></div>
 
     <script>
-        const API_URL = "http://localhost:8000";
-        let attackCount = 0;
-        let benignCount = 0;
-
-        // --- CHART LOGIC ---
-        const ctx = document.getElementById('statsChart').getContext('2d');
-        const myChart = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: ['Benign', 'Attack'],
-                datasets: [{
-                    data: [0, 0],
-                    backgroundColor: ['#10B981', '#EF4444'], // Green for Benign, Red for Attack
-                    borderWidth: 2
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: { legend: { display: false } }
-            }
-        });
-
-        function updateChart() {
-            myChart.data.datasets[0].data = [benignCount, attackCount];
-            myChart.update();
-            document.getElementById('benignLabel').innerText = benignCount;
-            document.getElementById('attackLabel').innerText = attackCount;
-        }
-
-        // --- API COMMUNICATION ---
         async function sendAnalysis() {
-            const path = document.getElementById('apiPath').value;
-            const method = document.getElementById('apiMethod').value;
-            const body = document.getElementById('apiBody').value;
-
-            if (!path) {
-                alert("Please enter an API path");
-                return;
-            }
-
-            const requestPayload = {
-                method: method,
-                path: path,
-                headers: {"Content-Type": "application/json"},
-                body: body || "{}"
-            };
-
+            const resultDiv = document.getElementById('result');
             try {
-                const response = await fetch(`${API_URL}/analyze`, {
+                const logData = JSON.parse(document.getElementById('logInput').value);
+                resultDiv.style.display = 'block';
+                resultDiv.className = '';
+                resultDiv.innerText = "Analyzing...";
+
+                const resp = await fetch('http://localhost:8000/analyze', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(requestPayload)
+                    body: JSON.stringify(logData)
                 });
-
-                if (!response.ok) throw new Error("Failed to submit job");
-
-                const { job_id } = await response.json();
+                const { job_id } = await resp.json();
                 pollStatus(job_id);
-            } catch (error) {
-                console.error("Submission Error:", error);
-                alert("Could not connect to Backend. Ensure Docker is running.");
-            }
+            } catch (e) { alert("Invalid JSON format!"); }
         }
 
         async function pollStatus(jobId) {
-            let attempts = 0;
-            const maxAttempts = 60; // Max wait 60 seconds
-
             const interval = setInterval(async () => {
-                try {
-                    attempts++;
-                    const res = await fetch(`${API_URL}/status/${jobId}`);
-                    if (!res.ok) throw new Error("Polling error");
-
-                    const data = await res.json();
-
-                    if (data.status === "Completed") {
-                        clearInterval(interval);
-                        updateUI(data);
-                    } else if (data.status === "Failed" || attempts > maxAttempts) {
-                        clearInterval(interval);
-                        alert("Analysis timed out or failed on worker.");
-                    }
-                } catch (error) {
+                const resp = await fetch(`http://localhost:8000/status/${jobId}`);
+                const data = await resp.json();
+                if (data.status === 'Completed') {
                     clearInterval(interval);
-                    console.error("Polling Error:", error);
+                    const div = document.getElementById('result');
+                    div.innerText = `Prediction: ${data.result}`;
+                    div.className = data.result;
                 }
             }, 1000);
-        }
-
-        function updateUI(data) {
-            const tableBody = document.querySelector('#resultsTable tbody');
-            const row = tableBody.insertRow(0);
-            const prediction = data.result.prediction;
-            const confidence = (data.result.confidence * 100).toFixed(1);
-            
-            const resultColor = prediction === 'Attack' ? 'text-red-600' : 'text-green-600';
-
-            row.innerHTML = `
-                <td class="p-3 border text-sm text-gray-500 font-mono">${data.job_id.slice(0, 8)}</td>
-                <td class="p-3 border text-center font-bold ${resultColor}">${prediction}</td>
-                <td class="p-3 border text-right font-medium text-gray-700">${confidence}%</td>
-            `;
-
-            if (prediction === 'Attack') attackCount++; else benignCount++;
-            updateChart();
         }
     </script>
 </body>
