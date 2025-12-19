@@ -126,4 +126,4 @@ While the GNN and Stacking Ensemble show nearly identical results on the test se
 
 1. **Structural Diversity:** Unlike the GNN which relies on graph patterns, the Stacking model incorporates the **Isolation Forest**, an **Unsupervised** model. This allows the system to flag requests that look "weird" statistically, even if they don't match known attack signatures or graph structures.
 2. **Generalization:** By combining multiple architectures (Trees, Graphs, and Anomalies), the ensemble reduces the risk of overfitting to the training data. This diversity significantly increases the probability of detecting novel, previously unseen attack vectors that a single model might miss.
-3. **Balanced Defense:** The Stacking layer effectively moderates the GNN’s sensitivity with the Random Forest’s precision, ensuring high-security coverage while maintaining a low impact on legitimate user experience.
+
