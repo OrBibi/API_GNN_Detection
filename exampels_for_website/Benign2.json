@@ -1,0 +1,34 @@
+{
+  "request": {
+    "body": "",
+    "headers": {
+      "Accept": "*/*",
+      "Accept-Encoding": "gzip, deflate, br",
+      "Accept-Language": "de-CH",
+      "Connection": "keep-alive",
+      "Content-Length": null,
+      "Cookie": null,
+      "Date": "Mon, 21 Nov 2022 18:26:39 GMT",
+      "Host": "127.0.0.1:5000",
+      "Sec-Fetch-Dest": "document",
+      "Sec-Fetch-Mode": "websocket",
+      "Sec-Fetch-Site": "none",
+      "Sec-Fetch-User": "?1",
+      "Set-Cookie": "['ck=ED-SWmKwDMBnsjwkQA_55nGX1wIyfX5TYp4Wb25U_EX8dRsCjRDGWzckewpiuWQb4NliEN8ACdjS2WsCzn_--Q; Domain=localhost:5000; Expires=Wed, 21 Dec 2022 18:26:39 GMT', 'uu=4whF6f8cz9zGou_jKFVBkpl9aKpEXTk9aNx9oF5Cdkg5GO4EQuxnUtoESWdgl0_1kbIg_raRZrfTBi3G3e5k-w; Domain=localhost:5000; Expires=Tue, 06 Dec 2022 18:26:39 GMT', 'session=84eb9de7-b384-41b0-8399-58539b5c1ae7; Expires=Mon, 21 Nov 2022 18:56:39 GMT']",
+      "User-Agent": "Mozilla/5.0 (X11; OpenBSD i386) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.125 Safari/537.36"
+    },
+    "method": "GET",
+    "url": "http://127.0.0.1:5000/states/3262"
+  },
+  "response": {
+    "body": "{\"error\": \"State not found\"}",
+    "headers": {
+      "Content-Length": "33",
+      "Content-Type": "application/json",
+      "Location": null,
+      "Set-Cookie": null
+    },
+    "status": "404 NOT FOUND",
+    "status_code": 404
+  }
+}

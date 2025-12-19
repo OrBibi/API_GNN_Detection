@@ -34,7 +34,7 @@ DATASETS = ['dataset_1', 'dataset_2', 'dataset_3', 'dataset_4']
 SPLITS_DIR = "data/processed/splits"
 DEVICE = torch.device('cpu') 
 MODEL_OUTPUT_DIR = 'models'
-BATCH_SIZE = 1024 # גודל באץ' להאצת ה-GNN
+BATCH_SIZE = 1024 # For GNN Inference
 
 # Model Paths
 RF_MODEL_PATH = os.path.join(MODEL_OUTPUT_DIR, 'combined_rf_model.pkl')
@@ -77,13 +77,13 @@ def fast_evaluate():
         graphs = []
         vectors = []
         
-        # בניית הנתונים (CPU Intensive)
+        # Building Graphs and Vectors
         for _, row in tqdm(df.iterrows(), total=len(df), desc=f"Building {ds}"):
             graphs.append(build_graph_from_log(row['request'], row['response'], row['label']))
             vectors.append(build_vector_from_log(row['request'], row['response']))
             all_labels.append(row['label'])
 
-        # GNN Inference בבאצ'ים (הרבה יותר מהיר)
+        # GNN Inference 
         loader = DataLoader(graphs, batch_size=BATCH_SIZE, shuffle=False)
         with torch.no_grad():
             for batch in tqdm(loader, desc=f"GNN Inference {ds}"):
