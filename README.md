@@ -25,6 +25,7 @@ The system utilizes a distributed containerized environment:
 * **`train_isolation_forest.py`**: Trains and calibrates the Isolation Forest for unsupervised anomaly detection using a specific min-max score normalization.
 * **`train_stacking.py`**: Trains the final **Meta-Classifier** (Logistic Regression) which learns how to best weight the predictions from all sub-models.
 * **`evaluate_models.py`**: Generates comprehensive performance reports and metrics for each individual model and the final ensemble.
+* **`create_images.py`**: create images for the readme and for the report.
 
 ### 2. Infrastructure & Deployment
 
@@ -64,6 +65,7 @@ python src/train_isolation_forest.py # Isolation Forest
 python src/train_stacking.py
 
 ```
+![stacking_weights](reports/figures/stacking_weights.png)
 
 ### Step 3: Performance Evaluation
 
@@ -73,6 +75,7 @@ After training, verify the individual and ensemble results using the test split:
 python src/evaluate_models.py
 
 ```
+
 
 ### Step 4: Full System Launch (Docker)
 
@@ -97,19 +100,30 @@ docker-compose up --build
 
 ## 📊 Conclusions & Results
 
-The evaluation demonstrates the power of the Stacking Ensemble approach compared to individual models:
+The evaluation demonstrates the high performance of the ensemble approach. By using a Weighted F1-Score and analyzing both Attack and Benign Recall, we can see the overall balance the model achieves:
 
-| Model | Global Accuracy | Attack Detection (Recall) | False Alarm Rate (FPR) |
-| --- | --- | --- | --- |
-| **GNN Only** | 87.86% | **91.11%** | 12.60% |
-| **Random Forest** | 92.26% | 46.64% | **1.34%** |
-| **Isolation Forest** | 78.30% | 59.60% | 19.07% |
-| **Stacking Ensemble** | **94.11%** | 85.78% | 4.72% |
+| Model | Global Accuracy | Attack Recall | Benign Recall | **Global F1-Score** | False Alarm Rate (FPR) |
+| --- | --- | --- | --- | --- | --- |
+| **GNN Only** | **97.29%** | 94.85% | 97.64% | **0.9736** | 2.36% |
+| **Random Forest** | 95.67% | 80.02% | **97.86%** | 0.9562 | **2.13%** |
+| **Isolation Forest** | 82.99% | 56.36% | 86.73% | 0.8440 | 13.26% |
+| **Stacking Ensemble** | 97.28% | **94.91%** | 97.62% | **0.9735** | 2.38% |
+
+![models_comparison_metrics](reports/figures/model_comparison_metrics.png)
+![radar_chart_comparison](reports/figures/radar_chart_comparison.png)
+
 
 ### Summary
 
-* **GNN** provides the highest raw detection rate (Recall) but suffers from a higher false alarm rate.
-* **Random Forest** is extremely precise with the lowest false alarm rate but misses nearly half of the attack variations.
-* **The Stacking Ensemble** (Final Result) achieves the best overall balance, reaching a **Global Accuracy of 94.11%**. It successfully combines the GNN's sensitivity with the Random Forest's precision, creating a robust production-ready classifier for HTTP API security.
+* **GNN (Graph Neural Network)** provides an exceptional balance, delivering the highest Global F1-Score (**0.9736**) by capturing complex structural relationships within the HTTP requests.
+* **Random Forest** remains the most precise model for legitimate traffic, achieving the highest Benign Recall (**97.86%**) and the lowest False Alarm Rate (**2.13%**).
+* **Isolation Forest** serves as an effective anomaly detector, identifying deviations in request patterns that supervised models might overlook.
+* **The Stacking Ensemble** (Final Result) achieves a **Global Accuracy of 97.28%** and the highest Attack Recall (**94.91%**).
 
----
+### 🛡️ Why Stacking is Superior for Production
+
+While the GNN and Stacking Ensemble show nearly identical results on the test set, the **Stacking Ensemble is the preferred choice for real-world deployment** due to its robustness against **Zero-Day Attacks**:
+
+1. **Structural Diversity:** Unlike the GNN which relies on graph patterns, the Stacking model incorporates the **Isolation Forest**, an **Unsupervised** model. This allows the system to flag requests that look "weird" statistically, even if they don't match known attack signatures or graph structures.
+2. **Generalization:** By combining multiple architectures (Trees, Graphs, and Anomalies), the ensemble reduces the risk of overfitting to the training data. This diversity significantly increases the probability of detecting novel, previously unseen attack vectors that a single model might miss.
+3. **Balanced Defense:** The Stacking layer effectively moderates the GNN’s sensitivity with the Random Forest’s precision, ensuring high-security coverage while maintaining a low impact on legitimate user experience.
