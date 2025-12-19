@@ -4,20 +4,19 @@ import torch
 import numpy as np
 from typing import Dict, Any, Tuple, List
 
-# We must import the feature aggregation logic
+# Import feature extraction and aggregation logic
 from features import extract_node_features, aggregate_node_features, FEATURE_DIM
 
 # --- Global State Replication ---
-# We replicate the state management logic from graph_builder.py 
-# to build the node map without coupling to the original file's globals.
+# Local state to build the node map for feature extraction without coupling to graph_builder.py
 
 # Format: {node_id: {'type': str, 'key_or_value': str, 'raw_data': Any}}
 _NODE_DETAILS_MAP: Dict[int, Dict[str, Any]] = {}
 _NODE_ID_COUNTER: int = 0
-_EDGES_LIST: List[Tuple[int, int]] = [] # Edges are ignored but kept for completeness
+_EDGES_LIST: List[Tuple[int, int]] = [] # Kept for structural consistency
 
 def _reset_global_state():
-    """Resets global state variables before processing a new log."""
+    """Resets global state variables before processing a new log entry."""
     global _NODE_ID_COUNTER, _NODE_DETAILS_MAP, _EDGES_LIST
     _NODE_ID_COUNTER = 0
     _NODE_DETAILS_MAP = {}
@@ -25,8 +24,7 @@ def _reset_global_state():
 
 def _create_node_vector(node_type: str, key_or_value: str, raw_data: Any) -> int:
     """
-    Creates a new node (for feature extraction purposes), assigns a unique ID, 
-    and stores its details in the local map.
+    Creates a new node for feature extraction purposes and assigns a unique ID.
     """
     global _NODE_ID_COUNTER, _NODE_DETAILS_MAP
     
@@ -44,32 +42,32 @@ def _create_node_vector(node_type: str, key_or_value: str, raw_data: Any) -> int
 
 def _traverse_json_vector(data: Any, parent_id: int):
     """
-    Recursively traverses a JSON structure (dict or list) to build nodes
-    but *only* for the purpose of feature extraction. Edge logic is minimal.
+    Recursively traverses a JSON structure using sorted keys to ensure deterministic 
+    node ID assignment and feature extraction order.
     """
     global _EDGES_LIST
     
     if isinstance(data, dict):
-        # Create a node representing the dictionary object itself
+        # Create a node representing the dictionary object
         dict_node_id = _create_node_vector(
             node_type='dict_container', 
             key_or_value='<OBJECT>', 
             raw_data=None
         )
-        _EDGES_LIST.append((parent_id, dict_node_id)) # Still track the edge for completeness
+        _EDGES_LIST.append((parent_id, dict_node_id))
         
-        # Process each key-value pair
-        for key, value in data.items():
+        # Process each key-value pair using sorted keys for determinism
+        for key, value in sorted(data.items()):
             
             # 1. Create a node for the KEY
             key_node_id = _create_node_vector(
                 node_type='key', 
-                key_or_value=key, 
+                key_or_value=str(key), 
                 raw_data=key
             )
             _EDGES_LIST.append((dict_node_id, key_node_id))
             
-            # 2. Recurse for the VALUE, with the Key Node as the parent
+            # 2. Recurse for the VALUE
             if isinstance(value, (dict, list)):
                 _traverse_json_vector(value, key_node_id) 
             else:
@@ -82,7 +80,7 @@ def _traverse_json_vector(data: Any, parent_id: int):
                 _EDGES_LIST.append((key_node_id, value_node_id))
                 
     elif isinstance(data, list):
-        # Create a node representing the list/array object itself
+        # Create a node representing the list container
         list_node_id = _create_node_vector(
             node_type='list_container', 
             key_or_value='<ARRAY>', 
@@ -107,15 +105,12 @@ def _traverse_json_vector(data: Any, parent_id: int):
 
 def build_vector_from_log(request_data: Dict[str, Any], response_data: Dict[str, Any]) -> np.ndarray:
     """
-    Main function to construct the Graph Feature Vector (GFV) from an API log entry.
-    This bypasses graph edge construction entirely for efficiency.
+    Constructs the Graph Feature Vector (GFV) deterministically from an API log entry.
     """
     
     _reset_global_state()
     
-    # 1. Create Root Nodes
-    
-    # The ultimate root node (for the entire API log)
+    # 1. Create Root Structure
     root_api_id = _create_node_vector(node_type='root_api', key_or_value='API_LOG', raw_data=None)
 
     # Request Root Node
@@ -126,22 +121,18 @@ def build_vector_from_log(request_data: Dict[str, Any], response_data: Dict[str,
     response_root_id = _create_node_vector(node_type='root_response', key_or_value='RESPONSE_ROOT', raw_data=None)
     _EDGES_LIST.append((root_api_id, response_root_id))
     
-    
-    # 2. Traverse Request and Response structures
+    # 2. Traverse structures deterministically
     _traverse_json_vector(request_data, request_root_id)
     _traverse_json_vector(response_data, response_root_id)
-    
     
     # 3. Handle Empty Case
     if _NODE_ID_COUNTER == 0:
         return np.zeros(FEATURE_DIM * 2, dtype=np.float32)
 
-    # 4. CALCULATE NODE FEATURES (X)
-    # Uses the map created by the local traversal logic
+    # 4. Calculate node-level features (X) using the deterministic map
     x = extract_node_features(_NODE_DETAILS_MAP)
     
-    
-    # 5. AGGREGATE TO FINAL GFV (1x132 vector)
+    # 5. Aggregate to final 1x132 vector (Mean and StdDev)
     gfv = aggregate_node_features(x)
     
     return gfv

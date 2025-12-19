@@ -1,4 +1,4 @@
-FROM python:3.9-slim
+FROM python:3.10-slim
 
 WORKDIR /app
 
@@ -16,6 +16,8 @@ COPY . .
 # Set environment variables
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
+# Set deterministic seed for Python hash functions
+ENV PYTHONHASHSEED=42
 
 # The command is overridden by docker-compose, but this is a safe default
 CMD ["python", "backend/main.py"]

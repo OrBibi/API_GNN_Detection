@@ -29,7 +29,7 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       - PYTHONPATH=/app
-    command: rq worker --url redis://redis:6379 default
+    command: rq worker --url redis://redis:6379 default --worker-class rq.SimpleWorker
     volumes:
       - .:/app
 
