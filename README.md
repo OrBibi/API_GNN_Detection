@@ -98,9 +98,30 @@ docker-compose up --build
 3. **Parallel Inference**: The GNN analyzes structural anomalies, while the RF and IF analyze statistical outliers.
 4. **Final Decision**: The Stacking Manager provides the final verdict based on the weighted confidence of all sub-models.
 
+## 📊 Dataset & Training Methodology
+
+The project utilizes a large-scale, heterogeneous dataset aggregated from four distinct sources (Dataset 1-4) to ensure the model generalizes well across different API architectures and attack patterns.
+
+### Data Partitioning
+
+To ensure absolute isolation and prevent data leakage, the data was strictly partitioned into three phases:
+
+1. **Training Set:** Used for the initial training of the base models (GNN, Random Forest, and Isolation Forest).
+2. **Validation Set (Stacking):** Used exclusively to train the Stacking Meta-Learner (Logistic Regression) and calibrate the sub-models.
+3. **Test Set:** A "clean slate" dataset used only for the final evaluation to report the 97.28% accuracy.
+
+### Detailed Breakdown
+
+| Phase | Usage | Total Samples | Malware (Attack) Samples |
+| --- | --- | --- | --- |
+| **Base Training** | GNN, RF, IF Training | **378,543** | ~47,337 (12.5%) |
+| **Stacking Phase** | Meta-Learner Calibration | **54,006** | ~6,750 (12.5%) |
+| **Final Evaluation** | Unseen Testing | **107,508** | **13,234 (12.3%)** |
+
+
 ## 📊 Conclusions & Results
 
-The evaluation demonstrates the high performance of the ensemble approach. By using a Weighted F1-Score and analyzing both Attack and Benign Recall, we can see the overall balance the model achieves:
+The final evaluation (on the **107,508 unseen test samples**) demonstrates the high performance of the ensemble approach. By using a Weighted F1-Score and analyzing both Attack and Benign Recall, we can see the overall balance the model achieves:
 
 | Model | Global Accuracy | Attack Recall | Benign Recall | **Global F1-Score** | False Alarm Rate (FPR) |
 | --- | --- | --- | --- | --- | --- |
