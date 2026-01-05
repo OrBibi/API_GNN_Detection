@@ -1,63 +1,88 @@
-from fastapi import FastAPI, HTTPException
+import os
+import shutil
+from fastapi import FastAPI, UploadFile, File
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from redis import Redis
 from rq import Queue
-import os
-import sys
 
-# Ensure root is in path
-sys.path.append('/app')
+# Import task
+from worker.tasks import analyze_parquet_task
 
-# Import the task function
-from worker.tasks import process_request
-
-app = FastAPI(title="API Intrusion Detection System")
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Connect to Redis
-redis_url = os.getenv("REDIS_URL", "redis://redis:6379")
-redis_conn = Redis.from_url(redis_url)
-task_queue = Queue("default", connection=redis_conn)
+# Setup Paths
+BASE_DIR = os.path.abspath("/app")
+UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
+RESULTS_DIR = os.path.join(BASE_DIR, "backend", "static", "results")
+
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+os.makedirs(RESULTS_DIR, exist_ok=True)
+
+app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "backend", "static")), name="static")
+
+# Redis
+redis_conn = Redis(host='redis', port=6379)
+q = Queue(connection=redis_conn)
 
 @app.get("/")
-async def root():
-    return {"message": "API Security Engine is running"}
+def read_root():
+    return {"message": "API is up and running", "docs_url": "/docs"}
 
-@app.post("/analyze", status_code=202)
-async def analyze_request(full_log: dict):
-    """
-    Receives a full API log (JSON) and enqueues it for the worker.
-    """
-    # Enqueue using the imported function object for reliability
-    job = task_queue.enqueue(process_request, full_log)
+@app.post("/upload")
+async def upload_file(file: UploadFile = File(...)):
+    file_path = os.path.join(UPLOAD_DIR, file.filename)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
     
-    return {
-        "job_id": job.get_id(),
-        "status": "Queued",
-        "message": "Full log received and queued for analysis"
-    }
+    job = q.enqueue(analyze_parquet_task, file_path, job_timeout='20m') # Increased timeout for building graphs
+    return {"job_id": job.get_id()}
 
 @app.get("/status/{job_id}")
 async def get_status(job_id: str):
-    job = task_queue.fetch_job(job_id)
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
+    """
+    Check RQ job status including 'stage' and 'progress'.
+    """
+    from rq.job import Job
+    try:
+        job = Job.fetch(job_id, connection=redis_conn)
+    except Exception:
+        return {"state": "unknown", "error": "Job not found"}
+
+    job.refresh()
     
-    if job.is_finished:
-        return {
-            "job_id": job_id,
-            "status": "Completed",
-            "result": job.result 
-        }
-    
-    return {
-        "job_id": job_id,
-        "status": job.get_status()
+    # Get custom metadata
+    progress = job.meta.get('progress', 0)
+    total_samples = job.meta.get('total_samples', 0)
+    stage = job.meta.get('stage', 'Queued') # New Field
+
+    response = {
+        "state": job.get_status(),
+        "progress": progress,
+        "total_samples": total_samples,
+        "stage": stage
     }
+
+    if job.is_finished:
+        response["state"] = "finished"
+        response["result"] = job.result
+    elif job.is_failed:
+        response["state"] = "failed"
+        response["error"] = str(job.exc_info)
+    
+    return response
+
+@app.get("/download/{filename}")
+async def download_file(filename: str):
+    file_path = os.path.join(RESULTS_DIR, filename)
+    if os.path.exists(file_path):
+        return FileResponse(file_path, filename=filename)
+    return {"error": "File not found"}

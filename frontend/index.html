@@ -2,54 +2,278 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>GNN API Guard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Cyber Detection</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
     <style>
-        body { font-family: sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; background: #f4f4f9; }
-        textarea { width: 100%; height: 200px; font-family: monospace; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
-        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-top: 10px; }
-        #result { margin-top: 20px; padding: 15px; border-radius: 5px; display: none; }
-        .Attack { background: #ffdada; color: #a94442; border: 1px solid #ebccd1; }
-        .Benign { background: #dff0d8; color: #3c763d; border: 1px solid #d6e9c6; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f4f7f6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            color: #333;
+        }
+
+        .card {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            width: 100%;
+            max-width: 650px;
+            text-align: center;
+        }
+
+        h1 { font-size: 24px; margin-bottom: 10px; color: #2c3e50; }
+        p.subtitle { color: #7f8c8d; font-size: 14px; margin-bottom: 30px; }
+
+        .file-upload-wrapper { position: relative; margin-bottom: 20px; }
+        input[type="file"] { display: none; }
+
+        .custom-file-upload {
+            border: 2px dashed #bdc3c7;
+            display: inline-block;
+            padding: 30px;
+            cursor: pointer;
+            width: 100%;
+            box-sizing: border-box;
+            border-radius: 8px;
+            color: #7f8c8d;
+            transition: all 0.3s;
+        }
+
+        .custom-file-upload:hover {
+            border-color: #3498db;
+            color: #3498db;
+            background-color: #f0f8ff;
+        }
+
+        .btn-primary {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.3s;
+            width: 100%;
+        }
+
+        .btn-primary:hover { background-color: #2980b9; }
+
+        .btn-secondary {
+            display: inline-block;
+            background-color: #2ecc71;
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            margin-top: 15px;
+            font-weight: 600;
+        }
+
+        #progressArea { margin-top: 30px; text-align: left; }
+        .progress-container {
+            background-color: #e0e0e0;
+            border-radius: 10px;
+            height: 10px;
+            width: 100%;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        .progress-bar {
+            background-color: #3498db;
+            height: 100%;
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+        .status-text { font-size: 14px; color: #555; display: flex; justify-content: space-between; }
+
+        #resultsArea { margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px; }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .metric-box {
+            text-align: center;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 8px;
+        }
+        .metric-value { font-size: 18px; font-weight: bold; color: #2c3e50; }
+        .metric-label { font-size: 12px; color: #95a5a6; }
+
+        .hidden { display: none; }
+        img { max-width: 100%; border: 1px solid #eee; border-radius: 8px; margin-top: 15px; }
     </style>
 </head>
 <body>
-    <h1>🛡️ API Log Classifier</h1>
-    <p>Paste a full JSON log (request/response) to analyze:</p>
-    <textarea id="logInput" placeholder='{"request": {...}, "response": {...}}'></textarea>
-    <button onclick="sendAnalysis()">Analyze Log</button>
 
-    <div id="result"></div>
+    <div class="card">
+        <h1>GNN Malware Analysis</h1>
+        <p class="subtitle">Upload your Parquet file to detect anomalies</p>
+        
+        <label class="file-upload-wrapper">
+            <label for="fileInput" class="custom-file-upload">
+                <span id="fileName">Click to select a file (Parquet)</span>
+            </label>
+            <input type="file" id="fileInput" accept=".parquet" onchange="updateFileName()">
+        </label>
+
+        <button onclick="uploadFile()" class="btn-primary">Upload & Analyze</button>
+
+        <div id="progressArea" class="hidden">
+            <div class="status-text">
+                <span id="statusLabel">Initializing...</span>
+                <span id="percentLabel">0%</span>
+            </div>
+            <div class="progress-container">
+                <div id="progressBar" class="progress-bar"></div>
+            </div>
+            <p style="font-size: 13px; color: #7f8c8d; margin-top: 5px;">
+                Total Samples Found: <strong id="sampleCountDisplay">Calculating...</strong>
+            </p>
+        </div>
+
+        <div id="resultsArea" class="hidden">
+            <div class="metrics-grid">
+                <div class="metric-box">
+                    <div class="metric-value" id="resSamples">-</div>
+                    <div class="metric-label">Total Samples</div>
+                </div>
+                
+                <div class="metric-box metric-data">
+                    <div class="metric-value" id="resAccuracy">-</div>
+                    <div class="metric-label">Accuracy</div>
+                </div>
+                <div class="metric-box metric-data">
+                    <div class="metric-value" id="resAttackRecall">-</div>
+                    <div class="metric-label">Attack Recall</div>
+                </div>
+                <div class="metric-box metric-data">
+                    <div class="metric-value" id="resBenignRecall">-</div>
+                    <div class="metric-label">Benign Recall</div>
+                </div>
+            </div>
+
+            <div id="cmContainer">
+                <img id="cmImage" src="" alt="Confusion Matrix">
+            </div>
+            <p id="noLabelsMsg" class="hidden" style="color: orange; font-size: 14px;">Prediction only (No Labels)</p>
+
+            <a id="downloadLink" href="#" class="btn-secondary">Download Analyzed File</a>
+        </div>
+    </div>
 
     <script>
-        async function sendAnalysis() {
-            const resultDiv = document.getElementById('result');
-            try {
-                const logData = JSON.parse(document.getElementById('logInput').value);
-                resultDiv.style.display = 'block';
-                resultDiv.className = '';
-                resultDiv.innerText = "Analyzing...";
+        const API_URL = "http://localhost:8000";
 
-                const resp = await fetch('http://localhost:8000/analyze', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(logData)
-                });
-                const { job_id } = await resp.json();
-                pollStatus(job_id);
-            } catch (e) { alert("Invalid JSON format!"); }
+        function updateFileName() {
+            const input = document.getElementById('fileInput');
+            const label = document.getElementById('fileName');
+            if(input.files && input.files.length > 0) {
+                label.innerText = input.files[0].name;
+                label.style.color = "#2c3e50";
+                label.style.borderColor = "#3498db";
+            }
+        }
+
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            if (!fileInput.files[0]) {
+                alert("Please select a file first.");
+                return;
+            }
+
+            document.getElementById('resultsArea').classList.add('hidden');
+            document.getElementById('progressArea').classList.remove('hidden');
+            
+            updateProgress(0, "Uploading...", "Calculating...");
+
+            const formData = new FormData();
+            formData.append("file", fileInput.files[0]);
+
+            try {
+                const response = await fetch(`${API_URL}/upload`, { method: 'POST', body: formData });
+                const data = await response.json();
+                pollStatus(data.job_id);
+            } catch (error) {
+                console.error("Error:", error);
+                alert("Upload failed.");
+                document.getElementById('progressArea').classList.add('hidden');
+            }
+        }
+
+        function updateProgress(percent, statusText, sampleCount) {
+            document.getElementById('progressBar').style.width = percent + "%";
+            document.getElementById('percentLabel').innerText = percent + "%";
+            // Update the text dynamically (Building Graphs... / Running Inference...)
+            document.getElementById('statusLabel').innerText = statusText;
+            
+            if(sampleCount) {
+                document.getElementById('sampleCountDisplay').innerText = sampleCount;
+            }
         }
 
         async function pollStatus(jobId) {
             const interval = setInterval(async () => {
-                const resp = await fetch(`http://localhost:8000/status/${jobId}`);
-                const data = await resp.json();
-                if (data.status === 'Completed') {
-                    clearInterval(interval);
-                    const div = document.getElementById('result');
-                    div.innerText = `Prediction: ${data.result}`;
-                    div.className = data.result;
+                try {
+                    const response = await fetch(`${API_URL}/status/${jobId}`);
+                    const data = await response.json();
+
+                    const samples = data.total_samples > 0 ? data.total_samples : "Calculating...";
+                    
+                    // Pass data.stage to the update function
+                    updateProgress(data.progress, data.stage || "Processing...", samples);
+
+                    if (data.state === 'finished') {
+                        clearInterval(interval);
+                        updateProgress(100, "Complete!", data.total_samples);
+                        setTimeout(() => showResults(data.result), 500);
+                    } else if (data.state === 'failed') {
+                        clearInterval(interval);
+                        alert("Analysis Failed: " + data.error);
+                        document.getElementById('progressArea').classList.add('hidden');
+                    }
+                } catch (error) {
+                    console.error("Polling Error:", error);
                 }
             }, 1000);
+        }
+
+        function showResults(result) {
+            document.getElementById('progressArea').classList.add('hidden');
+            document.getElementById('resultsArea').classList.remove('hidden');
+
+            document.getElementById('downloadLink').href = API_URL + result.download_url;
+            document.getElementById('resSamples').innerText = result.total_samples;
+
+            const metricBoxes = document.querySelectorAll('.metric-data');
+            
+            if (result.accuracy !== null) {
+                metricBoxes.forEach(el => el.style.display = 'block');
+                document.getElementById('cmContainer').classList.remove('hidden');
+                document.getElementById('noLabelsMsg').classList.add('hidden');
+
+                document.getElementById('resAccuracy').innerText = (result.accuracy * 100).toFixed(2) + "%";
+                document.getElementById('resAttackRecall').innerText = (result.attack_recall * 100).toFixed(2) + "%";
+                document.getElementById('resBenignRecall').innerText = (result.benign_recall * 100).toFixed(2) + "%";
+                
+                document.getElementById('cmImage').src = API_URL + result.image_url + "?t=" + new Date().getTime();
+            } else {
+                metricBoxes.forEach(el => el.style.display = 'none');
+                document.getElementById('cmContainer').classList.add('hidden');
+                document.getElementById('noLabelsMsg').classList.remove('hidden');
+            }
         }
     </script>
 </body>

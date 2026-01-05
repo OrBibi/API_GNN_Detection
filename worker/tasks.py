@@ -1,107 +1,155 @@
 import os
-import torch
-import joblib
-import numpy as np
 import sys
-import json
+import torch
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from torch_geometric.loader import DataLoader
+from sklearn.metrics import confusion_matrix, recall_score
+from rq import get_current_job
 
-# --- 1. System Path Fix (CRITICAL) ---
-# This ensures that when we import from src, those modules can find 'features.py'
-# which sits directly inside /app/src/
-sys.path.append('/app')
-sys.path.append('/app/src')
+# --- PATH CONFIGURATION ---
+base_path = os.path.abspath("/app")
+src_path = os.path.join(base_path, "src")
+if src_path not in sys.path:
+    sys.path.append(src_path)
 
-# --- 2. Import EXISTING Builders ---
-# We use the exact code that was used for training
-from src.graph_builder import build_graph_from_log
-from src.vector_builder import build_vector_from_log 
-from src.model import GNNClassifier
-from src.features import FEATURE_DIM 
+# Import GNN model only (Stacking removed based on previous request)
+from gnn_model import GNNClassifier 
+from graph_builder import build_graph_from_log
+from features import FEATURE_DIM
 
-# --- 3. Configuration ---
-MODEL_DIR = "/app/models"
+# --- CONFIGURATION ---
 DEVICE = torch.device('cpu')
+MODEL_PATH = os.path.join(base_path, "models", "final_combined_gnn_model.pth")
+OUTPUT_DIR = os.path.join(base_path, "backend", "static", "results")
 
-# --- 4. Load Models (Once) ---
-RF_MODEL = joblib.load(os.path.join(MODEL_DIR, 'combined_rf_model.pkl'))
-IF_PACKAGE = joblib.load(os.path.join(MODEL_DIR, 'combined_if_model_calibrated.pkl'))
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# Load GNN structure and weights
-GNN_MODEL = GNNClassifier(feature_dim=FEATURE_DIM).to(DEVICE)
-GNN_MODEL.load_state_dict(torch.load(os.path.join(MODEL_DIR, 'final_combined_gnn_model.pth'), map_location=DEVICE))
-GNN_MODEL.eval()
+def generate_confusion_matrix_image(y_true, y_pred, output_path):
+    """Generates and saves a confusion matrix heatmap."""
+    cm = confusion_matrix(y_true, y_pred)
+    plt.figure(figsize=(6, 5))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+                xticklabels=['Benign', 'Attack'],
+                yticklabels=['Benign', 'Attack'])
+    plt.title('GNN Confusion Matrix')
+    plt.ylabel('True Label')
+    plt.xlabel('Predicted Label')
+    plt.tight_layout()
+    plt.savefig(output_path)
+    plt.close()
 
-STACKING_MODEL = joblib.load(os.path.join(MODEL_DIR, 'final_stacking_model.pkl'))
-
-def process_request(full_log):
+def analyze_parquet_task(file_path):
     """
-    Processing task using the ORIGINAL source code builders.
-    Maps input data to strictly match the Training Dataset schema.
+    RQ Task with Two-Stage Progress Reporting:
+    1. Graph Construction Phase
+    2. Inference Phase
     """
     try:
-        # Extract raw data from the input (which comes from index.html/main.py)
-        raw_req = full_log.get('request', {})
-        raw_res = full_log.get('response', {})
-
-        # --- DATA MAPPING STRATEGY ---
-        # Based on actual training data from parquet:
-        # Request: method, url, headers, body (string)
-        # Response: status_code, status, headers, body (string)
+        job = get_current_job()
         
-        request_obj = {
-            "method": str(raw_req.get('method', 'GET')),
-            "url": str(raw_req.get('url', '')),
-            "headers": raw_req.get('headers', {}),
-            "body": str(raw_req.get('body', ''))
-        }
+        if not os.path.isabs(file_path):
+            file_path = os.path.join(base_path, file_path)
 
-        response_obj = {
-            "status_code": int(raw_res.get('status_code', 200)),
-            "status": str(raw_res.get('status', '')),
-            "headers": raw_res.get('headers', {}),
-            "body": str(raw_res.get('body', ''))
-        }
+        # 1. Load Data
+        df = pd.read_parquet(file_path)
+        total_samples = len(df)
 
+        # Initial Status Update
+        if job:
+            job.meta['total_samples'] = total_samples
+            job.meta['progress'] = 0
+            job.meta['stage'] = "Initializing..."
+            job.save_meta()
 
-        # --- 5. USE EXISTING BUILDERS ---
-        # No local logic. We trust the src code.
+        if not {'request', 'response'}.issubset(df.columns):
+            return {'status': 'failed', 'error': 'Missing request/response columns'}
+
+        has_label = 'label' in df.columns
+
+        # 2. Load Model
+        model = GNNClassifier(feature_dim=FEATURE_DIM).to(DEVICE)
         
-        # Build Graph (for GNN)
-        graph = build_graph_from_log(request_obj, response_obj, label=0)
-        
-        # Build Vector (for RF/IF)
-        gfv = build_vector_from_log(request_obj, response_obj)
-        X_tab = np.array([gfv])
-
-        # --- 6. INFERENCE ---
-        
-        # GNN
-        with torch.no_grad():
-            x = graph.x.to(DEVICE).float()
-            edge_index = graph.edge_index.to(DEVICE)
-            batch = torch.zeros(x.shape[0], dtype=torch.long).to(DEVICE)
+        if not os.path.exists(MODEL_PATH):
+            return {'status': 'failed', 'error': f'Model file missing at {MODEL_PATH}'}
             
-            gnn_out = GNN_MODEL(x, edge_index, batch)
-            gnn_prob = torch.softmax(gnn_out, dim=1)[0, 1].item()
+        model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
+        model.eval()
 
-        # RF & IF
-        rf_prob = RF_MODEL.predict_proba(X_tab)[0, 1]
+        # 3. PHASE A: Build Graphs (Now with Progress)
+        graphs = []
         
-        if_model = IF_PACKAGE['model']
-        calib = IF_PACKAGE['calibration']
-        if_score = if_model.decision_function(X_tab)[0]
-        if_prob = np.clip((calib['max'] - if_score) / (calib['max'] - calib['min']), 0.0, 1.0)
+        # We iterate with index to calculate progress
+        for i, (_, row) in enumerate(df.iterrows()):
+            lbl = row['label'] if has_label else 0
+            graph = build_graph_from_log(row['request'], row['response'], lbl)
+            graphs.append(graph)
+            
+            # Update progress every 1% or at least every 10 rows to reduce Redis overhead
+            if job and (i % 10 == 0 or i == total_samples - 1):
+                progress = int(((i + 1) / total_samples) * 100)
+                job.meta['progress'] = progress
+                job.meta['stage'] = "Building Graphs..."
+                job.save_meta()
 
-        # Stacking
-        X_meta = np.array([[gnn_prob, rf_prob, if_prob]])
-        final_prob = STACKING_MODEL.predict_proba(X_meta)[0, 1]
+        # 4. PHASE B: Inference Loop (With Progress)
+        BATCH_SIZE = 64
+        loader = DataLoader(graphs, batch_size=BATCH_SIZE, shuffle=False)
+        predictions = []
+        total_batches = len(loader)
+
+        with torch.no_grad():
+            for i, batch in enumerate(loader):
+                batch = batch.to(DEVICE)
+                out = model(batch.x, batch.edge_index, batch.batch)
+                pred = out.argmax(dim=1).cpu().tolist()
+                predictions.extend(pred)
+                
+                # Update Progress
+                if job:
+                    progress = int(((i + 1) / total_batches) * 100)
+                    job.meta['progress'] = progress
+                    job.meta['stage'] = "Running Inference..."
+                    job.save_meta()
+
+        # 5. Save Output
+        df['predict'] = predictions
         
-        result = "Attack" if final_prob > 0.5 else "Benign"
+        base_name = os.path.basename(file_path).replace('.parquet', '')
+        res_filename = f"{base_name}_analyzed.parquet"
+        res_path = os.path.join(OUTPUT_DIR, res_filename)
         
-        return result
+        df.to_parquet(res_path, index=False)
+        
+        result_data = {
+            'status': 'completed',
+            'download_url': f"/download/{res_filename}",
+            'image_url': None,
+            'accuracy': None,
+            'attack_recall': None,
+            'benign_recall': None,
+            'total_samples': total_samples
+        }
+
+        # 6. Handle Metrics
+        if has_label:
+            img_filename = f"{base_name}_cm.png"
+            img_path = os.path.join(OUTPUT_DIR, img_filename)
+            generate_confusion_matrix_image(df['label'], df['predict'], img_path)
+            
+            acc = (df['label'] == df['predict']).mean()
+            attack_rec = recall_score(df['label'], df['predict'], pos_label=1, zero_division=0)
+            benign_rec = recall_score(df['label'], df['predict'], pos_label=0, zero_division=0)
+            
+            result_data['image_url'] = f"/static/results/{img_filename}"
+            result_data['accuracy'] = acc
+            result_data['attack_recall'] = attack_rec
+            result_data['benign_recall'] = benign_rec
+
+        return result_data
 
     except Exception as e:
-        print(f"WORKER ERROR: {str(e)}")
         import traceback
         traceback.print_exc()
-        return f"Error: {str(e)}"
+        return {'status': 'failed', 'error': str(e)}

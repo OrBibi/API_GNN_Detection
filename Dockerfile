@@ -1,4 +1,4 @@
-FROM python:3.10-slim
+FROM python:3.9-slim
 
 WORKDIR /app
 
@@ -7,17 +7,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install python dependencies (Removed celery, Added rq)
+RUN pip install --no-cache-dir \
+    fastapi uvicorn rq redis python-multipart \
+    torch torch-geometric pandas numpy scikit-learn seaborn matplotlib pyarrow fastparquet
 
-# Copy everything
-COPY . .
+# Copy the entire project
+COPY . /app
 
-# Set environment variables
-ENV PYTHONPATH=/app
-ENV PYTHONUNBUFFERED=1
-# Set deterministic seed for Python hash functions
-ENV PYTHONHASHSEED=42
+# Create necessary directories
+RUN mkdir -p uploads backend/static/results models
 
-# The command is overridden by docker-compose, but this is a safe default
-CMD ["python", "backend/main.py"]
+EXPOSE 8000
+
+# Default command (overridden in docker-compose)
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
