@@ -1,7 +1,6 @@
 # API Guard: AI-Powered HTTP Request Classifier
 
-API Guard is an intelligent intrusion detection engine designed to classify **HTTP API Requests** as either "Benign" or "Attack" in real-time. The system leverages a **Stacking Ensemble** architecture, combining the structural analysis of Graph Neural Networks (GNN) with the statistical robustness of Random Forest and Isolation Forest models.
-
+API Guard is an intelligent intrusion detection engine designed to classify **HTTP API Requests** as either "Benign" or "Attack" in real-time. The system use Graph Neural Networks (GNN).
 ## 🚀 System Architecture
 
 The system utilizes a distributed containerized environment:
